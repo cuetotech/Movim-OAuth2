@@ -2,8 +2,11 @@
 
 namespace App\Widgets\Login;
 
+use App\Services\OAuth\TokenIssuer;
+use App\Services\OAuth\TrustedIdentityResolver;
 use Moxl\Xec\Action\Storage\Get;
 use Moxl\Xec\Payload\Packet;
+use Moxl\Stanza\Stream;
 
 use Respect\Validation\Validator;
 use Defuse\Crypto\Key;
@@ -20,6 +23,8 @@ use Movim\Cookie;
 
 class Login extends Base
 {
+    private ?array $trustedIdentity = null;
+
     public function load()
     {
         $this->addcss('login.css');
@@ -47,6 +52,7 @@ class Login extends Base
     public function onConnected()
     {
         $this->toast($this->__('connection.socket_connected'));
+        $this->flushPendingStreamInit();
     }
 
     public function onSASLSuccess(Packet $packet)
@@ -65,6 +71,7 @@ class Login extends Base
     public function display()
     {
         $configuration = Configuration::get();
+        $this->trustedIdentity = (new TrustedIdentityResolver)->resolve();
 
         if (!empty($configuration->info)) {
             $converter = new GithubFlavoredMarkdownConverter([
@@ -109,6 +116,14 @@ class Login extends Base
         $this->view->assign('maxsessions', $configuration->maxsessions);
         $this->view->assign('maxsessionsreached', ($configuration->maxsessions > 0 && $started >= $configuration->maxsessions));
         $this->view->assign('error', $this->prepareError());
+        $this->view->assign('oauthEnabled', config('oauth.enabled'));
+        $this->view->assign('oauthPasswordFallback', config('oauth.allow_password_fallback', true));
+        $this->view->assign(
+            'oauthAutoLogin',
+            config('oauth.enabled')
+            && config('oauth.auto_login', true)
+            && $this->trustedIdentity !== null
+        );
 
         if (
             isset($_SERVER['PHP_AUTH_USER'])
@@ -186,6 +201,11 @@ class Login extends Base
 
     public function ajaxLogin($form, string $sessionId, string $timezone)
     {
+        if (config('oauth.enabled') && !config('oauth.allow_password_fallback', true)) {
+            $this->showErrorBlock('oauth_only');
+            return;
+        }
+
         $username = strtolower($form->username->value);
         $password = $form->password->value;
         $this->doLogin($username, $password, $timezone, $sessionId);
@@ -193,7 +213,136 @@ class Login extends Base
 
     public function ajaxHTTPLogin(string $login, string $password, string $sessionId, string $timezone)
     {
+        if (config('oauth.enabled') && !config('oauth.allow_password_fallback', true)) {
+            $this->showErrorBlock('oauth_only');
+            return;
+        }
+
         $this->doLogin($login, $password, $timezone, $sessionId);
+    }
+
+    public function ajaxHttpOAuthLogin(string $sessionId, string $timezone)
+    {
+        $trustedIdentity = (new TrustedIdentityResolver)->resolve();
+
+        if ($trustedIdentity === null) {
+            $this->showErrorBlock('oauth_identity');
+            return;
+        }
+
+        if ($sessionId == null || strlen($sessionId) != 32) {
+            $this->showErrorBlock('session');
+            return;
+        }
+
+        $configuration = Configuration::get();
+        $started = (int)requestAPI('started');
+
+        if ($configuration->maxsessions > 0 && $started >= $configuration->maxsessions) {
+            $this->showErrorBlock('max_sessions_reached');
+            return;
+        }
+
+        $login = $trustedIdentity['jid'];
+        [$username, $host] = explode('@', $login);
+
+        if (
+            !empty($configuration->xmppwhitelist)
+            && !in_array($host, $configuration->xmppwhitelist)
+        ) {
+            $this->showErrorBlock('unauthorized');
+            return;
+        }
+
+        $existing = \App\Session::where('username', $username)->where('host', $host)->first();
+
+        if ($existing) {
+            $process = (bool)requestAPI('exists', post: ['sid' => $existing->id]);
+
+            if ($process) {
+                $this->rpc('Login.setCookie', $existing->id, date(DATE_COOKIE, Cookie::getTime()));
+                $this->rpc('MovimUtils.redirect', $this->route('main'));
+                return;
+            }
+
+            $existing->delete();
+        }
+
+        if ($stale = \App\Session::find($sessionId)) {
+            $stale->delete();
+        }
+
+        try {
+            $tokenResponse = (new TokenIssuer)->issueToken(
+                $trustedIdentity['raw_identity'],
+                $login
+            );
+        } catch (\Throwable $e) {
+            logError($e);
+            $this->showErrorBlock('oauth_broker');
+            return;
+        }
+
+        $token = $tokenResponse['access_token'];
+
+        $user = User::firstOrNew(['id' => $login]);
+        $user->init();
+        $user->save();
+
+        $session = new \App\Session;
+        $session->init(
+            username: $username,
+            password: generateKey(64),
+            host: $host,
+            sessionId: $sessionId,
+            timezone: $timezone
+        );
+        $session->save();
+
+        $payload = json_encode([
+            'func' => 'message',
+            'b' => [
+                'w' => 'Login',
+                'f' => 'ajaxOAuthDaemonLogin',
+                'p' => [$login, $token, $timezone],
+            ],
+        ]);
+
+        $dispatched = requestAPI('ajax', post: [
+            'sid' => $sessionId,
+            'json' => rawurlencode($payload),
+        ]);
+
+        if ($dispatched === false) {
+            $session->delete();
+            $this->showErrorBlock('connection');
+        }
+    }
+
+    public function ajaxOAuthDaemonLogin(string $login, string $token, string $timezone)
+    {
+        if (!validateJid($login) || !Validator::stringType()->length(1, 4096)->isValid($token)) {
+            $this->showErrorBlock('oauth_broker');
+            return;
+        }
+
+        $user = User::where('id', $login)->first();
+        $linker = linker($this->sessionId);
+
+        if (!$user || $linker == null) {
+            $this->showErrorBlock('oauth_identity');
+            return;
+        }
+
+        [$username, $host] = explode('@', $login);
+
+        $linker->attachUser($user);
+        $linker->authentication->username = $username;
+        $linker->authentication->jid = $login;
+        $linker->authentication->token = $token;
+        $linker->timezone = $timezone;
+
+        $this->queueXmppConnection($login, $host);
     }
 
     public function ajaxQuickLogin(
@@ -205,6 +354,11 @@ class Login extends Base
         ?bool $check = false
     ) {
         if ($sessionId == null) return;
+
+        if (config('oauth.enabled') && !config('oauth.allow_password_fallback', true)) {
+            $this->showErrorBlock('oauth_only');
+            return;
+        }
 
         if (!validateJid($login)) {
             $this->showErrorBlock('login_format');
@@ -322,13 +476,59 @@ class Login extends Base
         );
         $s->save();
 
-        linker($s->id)->attachUser(User::where('id', $login)->first());
-        linker($s->id)->authentication->username = $username;
-        linker($s->id)->authentication->password = $password;
-        linker($s->id)->timezone = $timezone;
+        $linker = linker($s->id);
 
-        // We launch the XMPP socket
-        $this->rpc('register', $host);
-        linker($s->id)->writeXMPP(\Moxl\Stanza\Stream::init($host, $login));
+        if ($linker == null) {
+            $s->delete();
+            $this->showErrorBlock('connection');
+            return;
+        }
+
+        $linker->attachUser(User::where('id', $login)->first());
+        $linker->authentication->username = $username;
+        $linker->authentication->password = $password;
+        $linker->authentication->jid = $login;
+        $linker->timezone = $timezone;
+
+        $this->queueXmppConnection($login, $host);
+    }
+
+    private function queueXmppConnection(string $login, string $host): void
+    {
+        $linker = linker($this->sessionId);
+
+        if ($linker == null) {
+            return;
+        }
+
+        if (!$linker->session->get('host')) {
+            $linker->session->set('host', $host);
+            $linker->register($host);
+        }
+
+        $linker->session->set('pending_stream_init', [
+            'host' => $host,
+            'login' => $login,
+        ]);
+
+        $this->flushPendingStreamInit();
+    }
+
+    private function flushPendingStreamInit(): void
+    {
+        $linker = linker($this->sessionId);
+
+        if ($linker == null || !$linker->connected()) {
+            return;
+        }
+
+        $pending = $linker->session->get('pending_stream_init');
+
+        if (!is_array($pending) || empty($pending['host']) || empty($pending['login'])) {
+            return;
+        }
+
+        $linker->writeXMPP(Stream::init($pending['host'], $pending['login']));
+        $linker->session->delete('pending_stream_init');
     }
 }

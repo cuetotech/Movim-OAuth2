@@ -8,6 +8,8 @@
         }
 
         Login.domain = '{$domain}';
+        Login.oauthAutoLogin = {if="$oauthAutoLogin"}true{else}false{/if};
+        Login.passwordFallbackAllowed = {if="$oauthPasswordFallback"}true{else}false{/if};
         {if="isset($httpAuthUser)"}
             localStorage.username = '{$httpAuthUser}';
             MovimWebsocket.attach(function() {
@@ -54,17 +56,19 @@
             <form
                 method="post" action="login"
                 name="login">
-                <div {if="$maxsessionsreached"}class="disabled"{/if}>
-                    <input type="text" id="complete" tabindex="-1"/>
-                    <input type="text" pattern="^.+@.+$" name="username" id="username" autofocus required
-                        placeholder="username@server.com" >
-                    <label for="username">{$c->__('form.username')}</label>
-                </div>
-                <div {if="$maxsessionsreached"}class="disabled"{/if}>
-                    <input type="password" name="password" id="password" required
-                        placeholder="{$c->__('form.password')}"/>
-                    <label for="password">{$c->__('form.password')}</label>
-                </div>
+                {if="!$oauthEnabled || $oauthPasswordFallback"}
+                    <div {if="$maxsessionsreached"}class="disabled"{/if}>
+                        <input type="text" id="complete" tabindex="-1"/>
+                        <input type="text" pattern="^.+@.+$" name="username" id="username" autofocus required
+                            placeholder="username@server.com" >
+                        <label for="username">{$c->__('form.username')}</label>
+                    </div>
+                    <div {if="$maxsessionsreached"}class="disabled"{/if}>
+                        <input type="password" name="password" id="password" required
+                            placeholder="{$c->__('form.password')}"/>
+                        <label for="password">{$c->__('form.password')}</label>
+                    </div>
+                {/if}
 
                 <ul class="list thin">
                     <li class="info">
@@ -79,6 +83,8 @@
                                     {loop="$whitelist"}
                                         {$value}
                                     {/loop}
+                                {elseif="$oauthEnabled && !$oauthPasswordFallback"}
+                                    {$c->__('form.oauth_connect_info')}
                                 {else}
                                     {$c->__('form.connect_info')}
                                 {/if}
@@ -92,11 +98,11 @@
                         <li>
                             <div>
                                 <p class="center">
-                                    {if="!$maxsessionsreached"}
+                                    {if="!$maxsessionsreached && (!$oauthEnabled || $oauthPasswordFallback)"}
                                         <input
                                             type="submit"
                                             disabled
-                                            data-loading="{$c->__('button.connecting')}…"
+                                            data-loading="{$c->__('button.connecting')}..."
                                             value="{$c->__('page.login')}"
                                             class="button color"/>
                                     {/if}

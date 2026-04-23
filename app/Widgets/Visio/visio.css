@@ -55,15 +55,15 @@ body>#visio:not(:fullscreen) .participant:after,
 #visio[data-type=video] #dtmf,
 #visio #dtmf:not(.hide)~#participants,
 #visio:not([data-type=video]) #toggle_video,
+#visio[data-has-local-video=false] #toggle_video,
 
 body>#visio:not(:fullscreen) #toggle_mode,
 #visio:not([data-muji=true]) #toggle_mode,
 #visio:not([data-type=video]) #toggle_mode,
 
 #visio:not([data-type=video]) #switch_camera,
-#visio:not([data-type=video]) #screen_sharing,
 #visio:not([data-type=video]) #local_video,
-#visio:not([data-type=video]) #screen_sharing_video {
+#visio:not([data-type=video]) #screen_sharing_video:not(.sharing) {
     display: none;
 }
 

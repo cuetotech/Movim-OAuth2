@@ -12,6 +12,7 @@ var MovimVisio = {
     localVideo: null,
     localAudio: null,
     screenSharing: null,
+    hasLocalVideo: false,
 
     observer: null,
 
@@ -48,7 +49,7 @@ var MovimVisio = {
         if (isMuji == true) {
             let pc = new RTCPeerConnection({ 'iceServers': MovimVisio.services });
 
-            navigator.mediaDevices.getUserMedia(VisioUtils.getConstraints(withVideo)).then(stream => {
+            MovimVisio.requestUserMedia(withVideo).then(stream => {
                 stream.getTracks().forEach(track => {
                     pc.addTrack(track, stream);
                 });
@@ -96,10 +97,15 @@ var MovimVisio = {
 
         MovimTpl.loadingPage();
 
-        navigator.mediaDevices.getUserMedia(VisioUtils.getConstraints(withVideo)).then(stream => {
+        MovimVisio.requestUserMedia(withVideo).then(stream => {
             MovimTpl.finishedPage();
 
             MovimVisio.localStream = stream;
+            MovimVisio.hasLocalVideo = stream.getTracks().some(track => track.kind === 'video');
+            let visio = document.querySelector('#visio');
+            if (visio) {
+                visio.dataset.hasLocalVideo = MovimVisio.hasLocalVideo ? 'true' : 'false';
+            }
 
             if (lobby) {
                 lobby.classList.add('configure');
@@ -115,28 +121,47 @@ var MovimVisio = {
 
                 if (track.kind == 'audio') {
                     MovimVisio.localAudio.srcObject = stream;
-                } else if (withVideo && track.kind === 'video') {
+                } else if (track.kind === 'video') {
                     MovimVisio.localVideo.srcObject = stream;
 
                     if (lobby) {
                         let cameraPreview = lobby.querySelector('video#camera_preview');
-                        cameraPreview.addEventListener('loadeddata', () => cameraPreview.play());
-                        cameraPreview.srcObject = stream;
-                        cameraPreview.disablePictureInPicture = true;
+                        if (cameraPreview) {
+                            cameraPreview.addEventListener('loadeddata', () => cameraPreview.play());
+                            cameraPreview.srcObject = stream;
+                            cameraPreview.disablePictureInPicture = true;
+                        }
                     }
-
                 }
             });
 
-            VisioUtils.handleAudio();
-
-            if (withVideo) {
-                VisioUtils.enableScreenSharingButton();
+            if (!MovimVisio.hasLocalVideo && MovimVisio.localVideo) {
+                MovimVisio.localVideo.srcObject = null;
+                MovimVisio.localVideo.classList.add('video_off');
+                let cameraPreview = document.querySelector('video#camera_preview');
+                if (cameraPreview) {
+                    cameraPreview.srcObject = null;
+                }
+            } else if (MovimVisio.localVideo) {
+                MovimVisio.localVideo.classList.remove('video_off');
             }
+
+            VisioUtils.handleAudio();
+            VisioUtils.enableScreenSharingButton();
 
             navigator.mediaDevices.enumerateDevices().then(devices => MovimVisio.gotDevices(withVideo, devices));
         }, (e) => {
             MovimTpl.finishedPage();
+        });
+    },
+
+    requestUserMedia: function (withVideo) {
+        return navigator.mediaDevices.getUserMedia(VisioUtils.getConstraints(withVideo)).catch(error => {
+            if (!withVideo) {
+                throw error;
+            }
+
+            return navigator.mediaDevices.getUserMedia(VisioUtils.getConstraints(false));
         });
     },
 
@@ -230,6 +255,8 @@ var MovimVisio = {
         delete visio.dataset.type;
         delete visio.dataset.jid;
         delete visio.dataset.muji;
+        delete visio.dataset.hasLocalVideo;
+        MovimVisio.hasLocalVideo = false;
 
         if (document.fullscreenElement) {
             document.exitFullscreen();
