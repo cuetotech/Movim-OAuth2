@@ -1,6 +1,6 @@
 # ejabberd Token Service
 
-This is a small PHP endpoint meant to run on the ejabberd server.
+This is a small PHP endpoint meant to run on the ejabberd server. It is the simplest option when Apache already serves PHP on that host.
 
 It accepts `POST /token` from the Movim host, validates:
 
@@ -30,7 +30,7 @@ and returns JSON like:
 
 - `public/index.php`: the token endpoint
 - `config.example.php`: copy this to `config.php` and edit it
-- `apache-token-service.conf`: Apache virtual host example
+- `apache-token-service.conf`: Apache virtual host example for the PHP endpoint
 
 ## Minimal setup
 
@@ -57,3 +57,4 @@ OAUTH_HTTP_JID_BODY_FIELD=jid
 - Restrict the token service to the Movim host only
 - Prefer an internal-only hostname or firewall rule
 - If Movim and ejabberd are ever moved onto the same host, you can switch back to `OAUTH_ISSUER=ejabberdctl`
+- If you prefer a small long-running service instead of PHP under Apache, use `extras/ejabberd-token-service-python`

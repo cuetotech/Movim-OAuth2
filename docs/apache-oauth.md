@@ -111,6 +111,7 @@ The token service package is included in:
 
 - [extras/ejabberd-token-service/README.md](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service/README.md)
 - [extras/ejabberd-token-service/public/index.php](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service/public/index.php)
+- [extras/ejabberd-token-service-python/README.md](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service-python/README.md)
 
 It is intentionally small and only does one job:
 
@@ -118,6 +119,8 @@ It is intentionally small and only does one job:
 - normalize the trusted identity to a JID
 - call local `ejabberdctl oauth_issue_token`
 - return a short-lived token for `sasl_auth`
+
+Under Apache, use either the PHP endpoint directly as a normal virtual host, or run the Python 3 service on loopback and let Apache reverse proxy `/token` to it.
 
 ## ejabberd requirements
 

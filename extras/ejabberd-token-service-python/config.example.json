@@ -1,0 +1,16 @@
+{
+  "trusted_header": "X-Remote-User",
+  "authorization_header": "Bearer change-this-secret",
+  "allowed_ips": [
+    "127.0.0.1",
+    "::1"
+  ],
+  "xmpp_domain": "example.com",
+  "jid_body_field": "jid",
+  "ejabberdctl_path": "/usr/sbin/ejabberdctl",
+  "token_ttl": 300,
+  "token_scope": "sasl_auth",
+  "command_timeout": 5,
+  "listen_host": "127.0.0.1",
+  "listen_port": 8091
+}

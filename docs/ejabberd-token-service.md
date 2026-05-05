@@ -28,6 +28,7 @@ It:
 - [config.example.php](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service/config.example.php)
 - [public/index.php](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service/public/index.php)
 - [apache-token-service.conf](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service/apache-token-service.conf)
+- [Python 3 token service](/C:/Users/jcuetopa/OneDrive%20-%20NASA/Desktop/movim-oauth/movim-oauth/extras/ejabberd-token-service-python/README.md)
 
 ## Movim configuration
 
