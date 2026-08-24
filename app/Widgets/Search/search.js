@@ -39,7 +39,9 @@ var Search = {
                 subheader.classList.add('found');
             }
 
-            showall.classList.add('found');
+            if (showall) {
+                showall.classList.add('found');
+            }
             founds.forEach(item => item.classList.add('found'));
         } else if (key != '') {
             if (subheader) {
@@ -69,7 +71,11 @@ var Search = {
     },
 
     searchCurrent() {
-        Search.searchSomething(document.querySelector('#searchbar input[name=keyword').value);
+        const input = document.querySelector('#searchbar input[name=keyword]');
+
+        if (input) {
+            Search.searchSomething(input.value);
+        }
     },
 
     searchSomething : function(value) {
@@ -77,8 +83,10 @@ var Search = {
 
         clearTimeout(Search.timer);
 
-        if (value !== '') {
-            document.querySelector('#searchbar li.search').classList.add('searching');
+        const searchItem = document.querySelector('#searchbar li.search');
+
+        if (value !== '' && searchItem) {
+            searchItem.classList.add('searching');
         }
 
         Search.timer = setTimeout(() => {

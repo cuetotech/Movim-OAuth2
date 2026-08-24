@@ -74,12 +74,12 @@ class Upload extends Base
 
     public function ajaxHttpUploadXMPP(string $file)
     {
-        $this->rpc('Upload.setProgress', 'cloud_upload', $this->__('upload.upload_xmpp'));
+        $this->rpc('Upload.startXmppUpload', $this->__('upload.upload_xmpp'));
     }
 
     public function ajaxHttpProgressXMPP(int $percentage)
     {
-        $this->rpc('Upload.setProgress', 'cloud_upload', $percentage . '% - ' . $this->__('upload.upload_xmpp'));
+        $this->rpc('Upload.setXmppProgress', $percentage, $this->__('upload.upload_xmpp'));
     }
 
     public function ajaxPrepare($file)

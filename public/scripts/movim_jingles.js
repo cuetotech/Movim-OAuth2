@@ -81,6 +81,8 @@ var MovimJingleSession = function (jid, fullJid, id, name, avatarUrl) {
     }
 
     this.pc.ontrack = event => {
+        MovimVisio.setState(MovimVisio.states.in_call);
+
         var srcObject = null;
 
         if (event.streams && event.streams[0]) {
@@ -403,6 +405,8 @@ MovimJingleSession.prototype.onAcceptSDP = function (sdp) {
 }
 
 MovimJingleSession.prototype.onInitiateSDP = function (sdp) {
+    MovimVisio.setState(MovimVisio.states.connecting);
+
     this.pc.setRemoteDescription({ 'sdp': sdp + "\n", 'type': 'offer' })
         .then(() => {
             this.pc.createAnswer()

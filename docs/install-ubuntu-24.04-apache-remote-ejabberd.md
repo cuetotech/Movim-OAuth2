@@ -205,6 +205,11 @@ Use this as a starting point:
         RequestHeader set X-Remote-User "%{REMOTE_USER}s"
     </Location>
 
+    <LocationMatch "^/(manifest/?$|sw\.js$|theme/|scripts/|stickers/)">
+        AuthType None
+        Require all granted
+    </LocationMatch>
+
     ProxyPass        /ws/  ws://127.0.0.1:8080/
     ProxyPassReverse /ws/  ws://127.0.0.1:8080/
 </VirtualHost>

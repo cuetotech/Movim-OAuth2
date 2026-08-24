@@ -34,6 +34,7 @@ var MovimWebsocket = {
     attempts: 1,
     pong: false,
     closed: false,
+    reconnectScheduled: false,
     statusBar: null,
 
     launchAttached: function () {
@@ -64,6 +65,14 @@ var MovimWebsocket = {
     },
 
     init: function () {
+        clearTimeout(MovimWebsocket.reconnectTimeout);
+        MovimWebsocket.reconnectTimeout = null;
+        MovimWebsocket.reconnectScheduled = false;
+
+        if (MovimWebsocket.closed === true) {
+            return;
+        }
+
         if (window.location.protocol === "https:") {
             var uri = 'wss:' + BASE_URI + 'ws/';
         } else {
@@ -71,6 +80,10 @@ var MovimWebsocket = {
         }
 
         if (this.connection !== null) {
+            if (this.connection.readyState < 2) {
+                return;
+            }
+
             this.connection.onclose = null;
             this.connection.close();
         }
@@ -82,6 +95,8 @@ var MovimWebsocket = {
 
             MovimWebsocket.attempts = 1;
             clearTimeout(MovimWebsocket.reconnectTimeout);
+            MovimWebsocket.reconnectTimeout = null;
+            MovimWebsocket.reconnectScheduled = false;
 
             MovimWebsocket.launchAttached();
         };
@@ -120,7 +135,7 @@ var MovimWebsocket = {
 
             if (e.code == 1008) {
                 // The server closed the connection and asked to keep it this way
-                this.closed = true;
+                MovimWebsocket.closed = true;
                 MovimWebsocket.statusBar.classList.remove('hide', 'connect');
                 MovimWebsocket.connection.close();
             } if (e.code == 1006) {
@@ -198,12 +213,19 @@ var MovimWebsocket = {
     },
 
     reconnect: function () {
+        if (MovimWebsocket.closed === true || MovimWebsocket.reconnectScheduled) {
+            return;
+        }
+
         var interval = MovimWebsocket.generateInterval();
         console.log("Try to reconnect");
+        MovimWebsocket.reconnectScheduled = true;
 
         MovimWebsocket.reconnectTimeout = setTimeout(function () {
             // We've tried to reconnect so increment the attempts by 1
             MovimWebsocket.attempts++;
+            MovimWebsocket.reconnectTimeout = null;
+            MovimWebsocket.reconnectScheduled = false;
 
             // Show the reconnect state
             MovimWebsocket.statusBar.classList.remove('hide');
@@ -228,10 +250,17 @@ var MovimWebsocket = {
 
 MovimEvents.registerWindow('offline', 'movimwebsocket', () => {
     console.log('offline');
-    MovimWebsocket.connection.onerror();
+    if (MovimWebsocket.connection && typeof MovimWebsocket.connection.onerror === 'function') {
+        MovimWebsocket.connection.onerror();
+    }
 });
 
 MovimEvents.registerWindow('online', 'movimwebsocket', () => {
+    if (MovimWebsocket.connection !== null
+        && MovimWebsocket.connection.readyState < 2) {
+        return;
+    }
+
     MovimWebsocket.statusBar.classList.remove('hide');
     MovimWebsocket.statusBar.classList.add('connect');
 
@@ -240,6 +269,11 @@ MovimEvents.registerWindow('online', 'movimwebsocket', () => {
 });
 
 window.onbeforeunload = function () {
+    MovimWebsocket.closed = true;
+    clearTimeout(MovimWebsocket.reconnectTimeout);
+    MovimWebsocket.reconnectTimeout = null;
+    MovimWebsocket.reconnectScheduled = false;
+
     if (MovimWebsocket.connection !== null) {
         MovimWebsocket.connection.onclose = function () { }; // disable onclose handler first
         MovimWebsocket.connection.close()

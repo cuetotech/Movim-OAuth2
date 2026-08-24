@@ -4,24 +4,28 @@ var VisioUtils = {
     audioContext: null,
     remoteAudioContext: null,
 
-    handleAudio: function () {
+    handleAudio: async function () {
         if (VisioUtils.audioContext) {
             VisioUtils.audioContext.close();
             VisioUtils.audioContext = null;
         }
 
         VisioUtils.audioContext = new AudioContext();
+        VisioUtils.maxLevel = 0;
 
         try {
             var microphone = VisioUtils.audioContext.createMediaStreamSource(
                 MovimVisio.localAudio.srcObject
             );
+
+            await VisioUtils.audioContext.audioWorklet.addModule(BASE_URI + 'scripts/movim_visio_audio_worklet.js');
         } catch (error) {
             MovimUtils.logError(error);
             return;
         }
 
-        var javascriptNode = VisioUtils.audioContext.createScriptProcessor(128 * 64, 1, 1);
+        const audioWorkletNode = new AudioWorkletNode(VisioUtils.audioContext, 'visio-audioworklet');
+        const muteGain = VisioUtils.audioContext.createGain();
         var icon = document.querySelector('#toggle_audio i');
         var mainButton = document.getElementById('main');
         icon.innerText = 'mic';
@@ -33,25 +37,13 @@ var VisioUtils = {
             defaultMicrophone.classList.add('muted');
         }
 
-        microphone.connect(javascriptNode);
-        javascriptNode.connect(VisioUtils.audioContext.destination);
+        muteGain.gain.value = 0;
+        microphone.connect(audioWorkletNode);
+        audioWorkletNode.connect(muteGain);
+        muteGain.connect(VisioUtils.audioContext.destination);
 
-        javascriptNode.onaudioprocess = function (event) {
-            var inpt = event.inputBuffer.getChannelData(0);
-            var instant = 0.0;
-            var sum = 0.0;
-
-            for (var i = 0; i < inpt.length; ++i) {
-                sum += inpt[i] * inpt[i];
-            }
-
-            instant = Math.sqrt(sum / inpt.length);
-            VisioUtils.maxLevel = Math.max(VisioUtils.maxLevel, instant);
-
-            if (VisioUtils.maxLevel <= 0.005) VisioUtils.maxLevel = 0.005;
-
-            var base = (instant / VisioUtils.maxLevel);
-            var level = (base > 0.05) ? base ** .3 : 0;
+        audioWorkletNode.port.onmessage = function (event) {
+            var level = event.data.level;
             let step = 0;
 
             if (level == 0) {
@@ -91,7 +83,7 @@ var VisioUtils = {
                 }
             }
 
-            if (isMuteStep <= 5) {
+            if (isMuteStep <= 5 && mainButton) {
                 mainButton.style.outlineColor = 'rgba(255, 255, 255, ' + level.toFixed(2) + ')';
             }
         }
@@ -354,6 +346,8 @@ var VisioUtils = {
     cancelLobby: function (fullJid, id) {
         if (fullJid && id) {
             Visio_ajaxReject(fullJid, id);
+        } else if (MovimVisio.pendingCall) {
+            MovimVisio.goodbye();
         }
 
         Visio_ajaxClear(); Dialog_ajaxClear(); Notif.snackbarClear();

@@ -2,6 +2,7 @@ var MovimVisio = {
     id: null,
 
     calling: false,
+    pendingCall: null,
 
     pc: null,
 
@@ -31,10 +32,11 @@ var MovimVisio = {
         MovimVisio.localAudio = document.getElementById('local_audio');
     },
 
-    init: function (fullJid, jid, id, withVideo, isMuji) {
+    activateCallUI: function (jid, id, withVideo, isMuji) {
         Visio_ajaxPrepare(jid);
 
         MovimVisio.id = id;
+        MovimVisio.calling = false;
 
         // Set a lock for the current browser (in case there's several others opened)
         localStorage.setItem('callId', id);
@@ -45,6 +47,10 @@ var MovimVisio = {
         visio.dataset.jid = jid;
         visio.dataset.type = (withVideo) ? 'video' : 'audio';
         visio.dataset.muji = isMuji ? 'true' : 'false';
+    },
+
+    init: function (fullJid, jid, id, withVideo, isMuji, sendProceed = true) {
+        MovimVisio.activateCallUI(jid, id, withVideo, isMuji);
 
         if (isMuji == true) {
             let pc = new RTCPeerConnection({ 'iceServers': MovimVisio.services });
@@ -64,18 +70,97 @@ var MovimVisio = {
         } else {
             MovimJingles.initSession(jid, fullJid, id);
 
-            if (MovimVisio.id) {
-                // Called
+            if (sendProceed) {
                 Visio_ajaxProceed(fullJid, MovimVisio.id);
             } else {
-                // Calling
-                MovimVisio.id = crypto.randomUUID();
-                MovimVisio.calling = true; // TODO, remove me ?
-                Visio_ajaxPropose(jid, MovimVisio.id, withVideo);
+                MovimJingles.onProceed(jid, fullJid, MovimVisio.id);
             }
         }
 
-        Notif.setCallStatus(MovimVisio.states.in_call);
+        MovimVisio.setState(MovimVisio.states.connecting);
+    },
+
+    startLobbyCall: function (fullJid, jid, withVideo) {
+        if (MovimVisio.pendingCall || Object.keys(MovimJingles.sessions).length > 0 || !MovimVisio.localStream) {
+            return;
+        }
+
+        MovimVisio.pendingCall = {
+            fullJid: fullJid,
+            jid: jid,
+            id: crypto.randomUUID(),
+            withVideo: withVideo
+        };
+        MovimVisio.calling = true;
+
+        const startButton = document.getElementById('lobby_start');
+        if (startButton) {
+            startButton.classList.add('disabled');
+        }
+
+        MovimVisio.setLobbyStatus(MovimVisio.states.calling);
+        MovimVisio.setState(MovimVisio.states.calling);
+        Visio_ajaxPropose(jid, MovimVisio.pendingCall.id, withVideo);
+        Notif.snackbarClear();
+    },
+
+    abortPendingCall: function (status = null) {
+        MovimVisio.pendingCall = null;
+        MovimVisio.calling = false;
+
+        const startButton = document.getElementById('lobby_start');
+        if (startButton) {
+            startButton.classList.remove('disabled');
+        }
+
+        if (status != null) {
+            MovimVisio.setLobbyStatus(status);
+            MovimVisio.setState(status);
+        }
+    },
+
+    onRinging: function (jid, fullJid, id) {
+        if (!MovimVisio.pendingCall
+            || MovimVisio.pendingCall.id !== id
+            || MovimVisio.pendingCall.jid !== jid) {
+            return;
+        }
+
+        MovimVisio.setLobbyStatus(MovimVisio.states.ringing);
+        MovimVisio.setState(MovimVisio.states.ringing);
+    },
+
+    onProceed: function (jid, fullJid, id) {
+        if (!MovimVisio.pendingCall || MovimVisio.pendingCall.id !== id) {
+            if (MovimJingles.sessions[jid] != undefined) {
+                MovimJingles.onProceed(jid, fullJid, id);
+            }
+
+            return;
+        }
+
+        const pendingCall = MovimVisio.pendingCall;
+        MovimVisio.pendingCall = null;
+        Dialog_ajaxClear();
+        MovimVisio.init(fullJid, pendingCall.jid, id, pendingCall.withVideo, false, false);
+    },
+
+    setLobbyStatus: function (status) {
+        const lobbyStatus = document.getElementById('visio_lobby_status');
+
+        if (lobbyStatus) {
+            lobbyStatus.innerText = status ?? '';
+        }
+    },
+
+    setState: function (status) {
+        const state = document.querySelector('#visio p.state');
+
+        if (state) {
+            state.innerText = status ?? '';
+        }
+
+        Notif.setCallStatus(status);
     },
 
     setStates: function (states) {
@@ -238,6 +323,14 @@ var MovimVisio = {
     },
 
     goodbye: function (reason) {
+        if (MovimVisio.pendingCall) {
+            const pendingCall = MovimVisio.pendingCall;
+            MovimVisio.pendingCall = null;
+            MovimVisio.calling = false;
+            Visio_ajaxGoodbye(pendingCall.fullJid, pendingCall.id, reason);
+            return;
+        }
+
         let visio = document.querySelector('#visio');
         Visio_ajaxGoodbye(visio.dataset.jid, this.id, reason);
     },
@@ -246,8 +339,16 @@ var MovimVisio = {
         MovimTpl.finishedPage();
 
         MovimVisio.id = null;
-
-        Notif.setCallStatus(null);
+        MovimVisio.calling = false;
+        MovimVisio.pendingCall = null;
+        const startButton = document.getElementById('lobby_start');
+        if (startButton) {
+            startButton.classList.remove('disabled');
+        }
+        MovimVisio.setState(null);
+        MovimVisio.setLobbyStatus(null);
+        localStorage.removeItem('callId');
+        localStorage.removeItem('callJid');
 
         clearInterval(MovimVisio.activeSpeakerIntervalId);
 

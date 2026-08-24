@@ -15,7 +15,7 @@
                             {$c->__('visiolobby.called', $contact->truename)}
                         {/if}
                     </p>
-                    <p>{$c->__('visiolobby.setup')}</p>
+                    <p id="visio_lobby_status">{$c->__('visiolobby.setup')}</p>
                 </div>
             {else}
                 <span class="primary icon bubble">
@@ -31,7 +31,7 @@
                             {$c->__('visiolobby.muji_join', $conference->title)}
                         {/if}
                     </p>
-                    <p>{$c->__('visiolobby.setup')}</p>
+                    <p id="visio_lobby_status">{$c->__('visiolobby.setup')}</p>
                 </div>
             {/if}
         </li>
@@ -102,7 +102,7 @@
             <button onclick="VisioUtils.cancelLobby();" class="button flat red">
                 {$c->__('button.cancel')}
             </button>
-            <button id="lobby_start" onclick="MovimVisio.init('{$fullJid|echapJS}', '{$contact->id}', null, {if="$withvideo"}true{else}false{/if}); Dialog_ajaxClear(); Notif.snackbarClear();" class="button color green disabled">
+            <button id="lobby_start" onclick="MovimVisio.startLobbyCall('{$fullJid|echapJS}', '{$contact->id}', {if="$withvideo"}true{else}false{/if});" class="button color green disabled">
                 {if="$withvideo"}
                     <i class="material-symbols">videocam</i>
                 {else}

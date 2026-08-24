@@ -89,6 +89,24 @@
     opacity: 0.75;
 }
 
+#upload_progress .bar {
+    width: 100%;
+    height: 0.5rem;
+    margin-top: 0.75rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+#upload_progress .bar span {
+    width: 0;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--blue), var(--green));
+    transition: width 0.2s ease;
+}
+
 body.dropped:after {
     content: '';
     width: 100%;

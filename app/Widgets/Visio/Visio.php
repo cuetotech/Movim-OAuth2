@@ -44,6 +44,7 @@ class Visio extends Base
 
         $this->registerEvent('jinglepropose', 'onPropose');
         $this->registerEvent('jingleproceed', 'onProceed');
+        $this->registerEvent('jingleringing', 'onRinging');
         $this->registerEvent('jingleaccept', 'onAccept');
         $this->registerEvent('jingleretract', 'onRetract');
         $this->registerEvent('jinglereject', 'onReject');
@@ -199,8 +200,14 @@ class Visio extends Base
 
     public function onProceed(Packet $packet)
     {
+        $this->currentCall()->releasePending($packet->from, $packet->content);
         $this->currentCall()->start($packet->from, $packet->content);
-        $this->rpc('MovimJingles.onProceed', \bareJid($packet->from), $packet->from, $packet->content /* id */);
+        $this->rpc('MovimVisio.onProceed', \bareJid($packet->from), $packet->from, $packet->content /* id */);
+    }
+
+    public function onRinging(Packet $packet)
+    {
+        $this->rpc('MovimVisio.onRinging', \bareJid($packet->from), $packet->from, $packet->content);
     }
 
     // Deprecated
@@ -235,6 +242,7 @@ class Visio extends Base
 
     public function onTerminate(Packet $packet)
     {
+        $this->currentCall()->releasePending(\bareJid($packet->from), $packet->content);
         ($this->currentCall())->stop(\bareJid($packet->from), $packet->content);
 
         // Stop calling sound and clear the Dialog if there
@@ -333,6 +341,11 @@ class Visio extends Base
 
     public function ajaxPropose(string $to, string $id, ?bool $withVideo = false)
     {
+        if (!$this->currentCall()->reserve($to, $id)) {
+            $this->rpc('MovimVisio.abortPendingCall', $this->__('visio.failed'));
+            return;
+        }
+
         $message = Message::eventMessageFactory(
             $this->me,
             'jingle',
@@ -368,6 +381,7 @@ class Visio extends Base
 
     public function ajaxReject(string $to, string $id)
     {
+        $this->currentCall()->releasePending($to, $id);
         ($this->currentCall())->stop($to, $id);
 
         $this->rpc('Notif.incomingCallAnswer');
@@ -810,6 +824,7 @@ class Visio extends Base
                 ->setReason($reason ?? 'success')
                 ->request();
         } else {
+            $this->currentCall()->releasePending($to, $sid);
             $sr = $this->xmpp(new MessageRetract);
             $sr->setTo($to)
                 ->setId($sid)

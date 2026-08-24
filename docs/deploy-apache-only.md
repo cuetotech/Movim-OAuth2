@@ -96,6 +96,7 @@ The important pieces are:
 - rewrite all non-file requests to `index.php`
 - `ProxyPass /ws/ ws://127.0.0.1:8080/`
 - optional Apache auth that sets `REMOTE_USER` or `X-Remote-User`
+- public bootstrap endpoints such as `/manifest`, `/sw.js`, `/theme/`, `/scripts/`, and `/stickers/` exempted from Apache auth
 
 ## Token service choices with Apache
 

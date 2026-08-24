@@ -9,7 +9,7 @@ class JinglePropose extends Payload
     public function handle(?\SimpleXMLElement $stanza = null, ?\SimpleXMLElement $parent = null)
     {
         // Another session is already started
-        if (linker($this->me->session->id)->currentCall->isStarted()) {
+        if (linker($this->me->session->id)->currentCall->isBusy()) {
             $reject = new MessageReject($this->me, $this->me->session->id);
             $reject->setTo((string)$parent->attributes()->from)
                    ->setId((string)$stanza->attributes()->id)
