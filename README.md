@@ -1,12 +1,15 @@
-<p align="center"><img src="https://movim.eu/img/192.png"/></p>
-<h1 align="center">Movim</h1>
-<h3 align="center">Federated blogging and chat platform</h3>
+<h1 align="center">Movim OAuth</h1>
+<h3 align="center">An OAuth-focused fork of Movim</h3>
 
-![build ci badge](https://github.com/movim/movim/actions/workflows/main.yml/badge.svg?event=push)
+![build ci badge](https://github.com/cuetotech/movim-oauth/actions/workflows/main.yml/badge.svg?event=push)
+
+Fork notice
+-----------
+This repository is an independently maintained fork of [Movim](https://github.com/movim/movim), adding OAuth-related deployment and authentication customizations. It may diverge from upstream and is not the official Movim project or affiliated with its maintainers.
 
 About
 -----
-Movim is a federated blogging and chat platform that acts as a web frontend for the XMPP protocol.
+Movim is a federated blogging and chat platform that acts as a web frontend for the XMPP protocol. This fork retains Movim as its upstream project.
 
 ![movim screenshot](https://movim.eu/img/home.webp)
 
