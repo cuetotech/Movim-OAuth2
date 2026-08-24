@@ -19,13 +19,19 @@ class SASL extends Payload
             return;
         }
 
-        if (linker($this->sessionId)->authentication?->password) {
+        if (linker($this->sessionId)->authentication?->canAuthenticate()) {
             if (!is_array($mechanisms)) {
                 $mechanisms = [$mechanisms];
             }
 
             linker($this->sessionId)->authentication->choose($mechanisms);
-            linker($this->sessionId)->writeXMPP(linker($this->sessionId)->authentication->response());
+
+            if (linker($this->sessionId)->authentication->hasSelectedMechanism()) {
+                linker($this->sessionId)->writeXMPP(linker($this->sessionId)->authentication->response());
+            } else {
+                $this->pack('invalid-mechanism');
+                $this->event('saslfailure');
+            }
         }
     }
 }

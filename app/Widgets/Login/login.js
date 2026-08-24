@@ -1,6 +1,8 @@
 var Login = {
     domain: '@movim.eu',
     submitted: false,
+    oauthAutoLogin: false,
+    passwordFallbackAllowed: true,
 
     init: function () {
         // The form submission event
@@ -9,12 +11,19 @@ var Login = {
 
             Login.submitted = true;
 
-            // We register the socket
-            MovimWebsocket.connection.register(this.querySelector('input#username').value.replace(/.*@/, ''));
-            var button = this.querySelector('input[type=submit]');
-            button.value = button.dataset.loading;
+            var usernameField = this.querySelector('input#username');
+            if (!usernameField) {
+                return false;
+            }
 
-            localStorage.username = document.querySelector('input#username').value;
+            // We register the socket
+            MovimWebsocket.connection.register(usernameField.value.replace(/.*@/, ''));
+            var button = this.querySelector('input[type=submit]');
+            if (button) {
+                button.value = button.dataset.loading;
+            }
+
+            localStorage.username = usernameField.value;
 
             // A fallback security
             setTimeout('MovimWebsocket.unregister()', 20000);
@@ -66,19 +75,31 @@ var Login = {
                 localStorage.getItem('quickKey'),
                 Intl.DateTimeFormat().resolvedOptions().timeZone,
                 Login.getCookie(),
-                true, // check is we can actually quick login before registering
+                true,
             );
         }
     },
 
     quickLoginRegister: function () {
         MovimWebsocket.connection.register(localStorage.getItem('quickHost'));
+    },
+
+    oauthLogin: function () {
+        Login_ajaxHttpOAuthLogin(
+            Login.getCookie(),
+            Intl.DateTimeFormat().resolvedOptions().timeZone
+        );
     }
 }
 
 // The session linker is launched
 MovimWebsocket.start(function () {
-    Login.quickLogin();
+    if (Login.oauthAutoLogin) {
+        Login.oauthLogin();
+    } else if (Login.passwordFallbackAllowed) {
+        Login.quickLogin();
+    }
+
     Login.init();
 
     // We enable the form
@@ -89,7 +110,11 @@ MovimWebsocket.start(function () {
 });
 
 MovimWebsocket.register(function () {
-    if (Login.isQuick()) {
+    if (Login.oauthAutoLogin) {
+        return;
+    } else if (!Login.passwordFallbackAllowed) {
+        return;
+    } else if (Login.isQuick()) {
         Login_ajaxQuickLogin(
             localStorage.getItem('quickDeviceId'),
             localStorage.getItem('quickLogin'),
@@ -108,6 +133,10 @@ MovimWebsocket.register(function () {
 MovimEvents.registerWindow('loaded', 'login', () => {
     // We had the autocomplete system
     var login = document.querySelector('input#username');
+
+    if (!login) {
+        return;
+    }
 
     login.addEventListener('input', function () {
         if (this.value.indexOf('@') == -1) {

@@ -91,6 +91,7 @@ class Manifest extends Base
             'share_target' => [
                 'action' => "/share/",
                 'method' => 'POST',
+                'enctype' => 'application/x-www-form-urlencoded',
                 'params' => [
                     'title' => 'title',
                     'text' => 'description',

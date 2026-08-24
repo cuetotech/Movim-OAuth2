@@ -1,0 +1,18 @@
+[Unit]
+Description=ejabberd OAuth token service for Movim
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Type=simple
+ExecStart=/usr/bin/python3 /opt/ejabberd-token-service-python/token_service.py --config /etc/ejabberd-token-service-python/config.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

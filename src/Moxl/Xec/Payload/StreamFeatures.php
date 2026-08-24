@@ -20,26 +20,31 @@ class StreamFeatures extends Payload
                 }
             }
 
-            if (linker($this->sessionId)->authentication->password) {
+            if (linker($this->sessionId)->authentication->canAuthenticate()) {
                 if (!is_array($mechanisms)) {
                     $mechanisms = [$mechanisms];
                 }
 
                 linker($this->sessionId)->authentication->choose($mechanisms, $channelBindings);
 
-                $this->send(Stream::bind2Set(
-                    linker($this->sessionId)->authentication->getType(),
-                    linker($this->sessionId)->authentication->getResponse(),
-                    APP_TITLE . '.' . \generateKey(6)
-                ));
+                if (linker($this->sessionId)->authentication->hasSelectedMechanism()) {
+                    $this->send(Stream::bind2Set(
+                        linker($this->sessionId)->authentication->getType(),
+                        linker($this->sessionId)->authentication->getResponse(),
+                        APP_TITLE . '.' . \generateKey(6)
+                    ));
+                } else {
+                    $this->pack('invalid-mechanism');
+                    $this->event('sasl2failure');
+                }
             } elseif (
                 $stanza->register
-                && $stanza->register->attributes()->xmlns = 'http://jabber.org/features/iq-register'
+                && $stanza->register->attributes()->xmlns == 'http://jabber.org/features/iq-register'
             ) {
                 $g = new Get(sessionId: $this->sessionId);
                 $g->setTo($stanza->attributes()->from)->request();
             }
-        } elseif ($stanza->mechanisms && $stanza->mechanisms->attributes()->xmlns = 'urn:ietf:params:xml:ns:xmpp-sasl') {
+        } elseif ($stanza->mechanisms && $stanza->mechanisms->attributes()->xmlns == 'urn:ietf:params:xml:ns:xmpp-sasl') {
             (new SASL(sessionId: $this->sessionId))->handle($stanza->mechanisms, $stanza);
         }
     }
