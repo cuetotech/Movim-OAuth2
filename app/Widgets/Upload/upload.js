@@ -11,6 +11,8 @@ var Upload = {
     canvas: null,
     thumbhash: null,
     uploadButton: null,
+    browserPercent: 0,
+    xmppPercent: 0,
 
     init: function (appendDate) {
         Upload.launchInitiated();
@@ -180,8 +182,7 @@ var Upload = {
                         function (blob) {
                             Upload.prepare(blob);
                         },
-                        'image/jpeg',
-                        0.85
+                        'image/jpeg', 0.85
                     );
                 } else {
                     Upload.prepare(file);
@@ -228,7 +229,6 @@ var Upload = {
 
                     context.drawImage(preview, 0, 0, canvas.width, canvas.height);
                     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-
                     Upload.thumbhash = MovimUtils.arrayBufferToBase64(rgbaToThumbHash(pixels.width, pixels.height, pixels.data));
                 });
 
@@ -257,6 +257,8 @@ var Upload = {
     request: function (route, id) {
         Upload.xhr = new XMLHttpRequest();
         Upload.id = id;
+        Upload.browserPercent = 0;
+        Upload.xmppPercent = 0;
 
         if (Upload.uploadButton) {
             Upload.uploadButton.classList.add('disabled');
@@ -265,8 +267,8 @@ var Upload = {
         Upload.xhr.upload.addEventListener('progress', function (evt) {
             var percent = Math.floor(evt.loaded / evt.total * 100);
 
-            Upload.launchProgressed(percent);
-            Upload.setProgress('arrow_upload_progress', percent == 100 ? '' : percent + '%');
+            Upload.browserPercent = percent;
+            Upload.setBrowserProgress(percent);
         }, false);
 
         Upload.xhr.onreadystatechange = function () {
@@ -285,7 +287,7 @@ var Upload = {
                 Upload.launchFailed();
                 Upload_ajaxFailed();
 
-                Upload.setProgress('error', '');
+                Upload.setProgress('error', '', null);
 
                 if (Upload.uploadButton) {
                     Upload.uploadButton.classList.remove('disabled');
@@ -300,7 +302,7 @@ var Upload = {
             formData.append(Upload.id, Upload.file, Upload.name);
             Upload.xhr.send(formData);
 
-            Upload.setProgress('arrow_upload_ready', '');
+            Upload.setProgress('arrow_upload_ready', '0%', 0);
         }
     },
 
@@ -310,11 +312,41 @@ var Upload = {
         }
     },
 
-    setProgress: function (icon, text) {
+    setProgress: function (icon, text, percent = null) {
         if (document.querySelector('#upload_progress')) {
             document.querySelector('#upload_progress span.primary.upload i').innerText = icon;
             document.querySelector('#upload_progress li p').innerText = text;
+            const progressBar = document.querySelector('#upload_progress .bar span');
+
+            if (progressBar && percent != null) {
+                progressBar.style.width = percent + '%';
+            }
         }
+    },
+
+    syncProgress: function (percent, text = null, icon = 'arrow_upload_progress') {
+        const overallPercent = Math.min(100, Math.max(0, percent));
+
+        Upload.launchProgressed(overallPercent);
+        Upload.setProgress(icon, text ?? overallPercent + '%', overallPercent);
+    },
+
+    setBrowserProgress: function (percent) {
+        const overallPercent = Math.floor(percent / 2);
+
+        Upload.syncProgress(overallPercent, percent + '%', 'arrow_upload_progress');
+    },
+
+    startXmppUpload: function (text) {
+        Upload.xmppPercent = 0;
+        Upload.syncProgress(50, '0% - ' + text, 'cloud_upload');
+    },
+
+    setXmppProgress: function (percent, text) {
+        Upload.xmppPercent = percent;
+        const overallPercent = 50 + Math.floor(percent / 2);
+
+        Upload.syncProgress(overallPercent, percent + '% - ' + text, 'cloud_upload');
     },
 
     abort: function () {
@@ -334,6 +366,18 @@ var Upload = {
         Upload.name = null;
         Upload.prependName = null;
         Upload.file = null;
+        Upload.browserPercent = 0;
+        Upload.xmppPercent = 0;
+
+        if (document.querySelector('#upload_progress')) {
+            document.querySelector('#upload_progress span.primary.upload i').innerText = '';
+            document.querySelector('#upload_progress li p').innerText = '';
+
+            const progressBar = document.querySelector('#upload_progress .bar span');
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
+        }
     },
 
     attachEvents: function () {

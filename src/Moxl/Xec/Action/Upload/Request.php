@@ -14,6 +14,11 @@ class Request extends Action
     protected $_type;
 
     private const AUTHORIZED_HEADERS = ['authorization', 'cookie', 'expires'];
+    private const CANONICAL_HEADERS = [
+        'authorization' => 'Authorization',
+        'cookie' => 'Cookie',
+        'expires' => 'Expires',
+    ];
 
     public function request()
     {
@@ -34,9 +39,26 @@ class Request extends Action
             if ($stanza->slot->put->header) {
                 $headers = [];
 
-                foreach($stanza->slot->put->header as $header) {
-                    if (in_array(strtolower((string)$header->attributes()->name), self::AUTHORIZED_HEADERS)) {
-                        $headers[(string)$header->attributes()->name] = str_replace(["\n", "\r"], '', (string)$header);
+                foreach ($stanza->slot->put->header as $header) {
+                    // XEP-0363 requires case-insensitive allow-listing, newline
+                    // stripping for both names and values, and preservation of
+                    // repeated values for the same header in their original order.
+                    $name = str_replace(["\n", "\r"], '', (string)$header->attributes()->name);
+                    $lowerName = strtolower($name);
+
+                    if (!in_array($lowerName, self::AUTHORIZED_HEADERS, true)) {
+                        continue;
+                    }
+
+                    $canonicalName = self::CANONICAL_HEADERS[$lowerName];
+                    $value = str_replace(["\n", "\r"], '', (string)$header);
+
+                    if (!array_key_exists($canonicalName, $headers)) {
+                        $headers[$canonicalName] = $value;
+                    } elseif (is_array($headers[$canonicalName])) {
+                        $headers[$canonicalName][] = $value;
+                    } else {
+                        $headers[$canonicalName] = [$headers[$canonicalName], $value];
                     }
                 }
 

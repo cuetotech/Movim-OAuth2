@@ -4,10 +4,37 @@ namespace Moxl\Stanza;
 
 class Jingle
 {
+    private static function appendStoreHint(\DOMDocument $dom, \DOMElement $message): void
+    {
+        $message->appendChild($dom->createElementNS('urn:xmpp:hints', 'store'));
+    }
+
+    private static function appendReason(
+        \DOMDocument $dom,
+        \DOMElement $parent,
+        string $condition,
+        ?string $text = null
+    ): void {
+        $reason = $dom->createElementNS('urn:xmpp:jingle:1', 'reason');
+        $reason->appendChild($dom->createElementNS('urn:xmpp:jingle:1', $condition));
+
+        if ($text !== null && $text !== '') {
+            $reason->appendChild($dom->createElementNS('urn:xmpp:jingle:1', 'text', $text));
+        }
+
+        $parent->appendChild($reason);
+    }
+
+    private static function appendTieBreak(\DOMDocument $dom, \DOMElement $parent, bool $tieBreak): void
+    {
+        if ($tieBreak) {
+            $parent->appendChild($dom->createElementNS('urn:xmpp:jingle-message:0', 'tie-break'));
+        }
+    }
+
     /**
      * XEP-0353: Jingle Message Initiation
      */
-
     public static function messagePropose(string $to, string $id, bool $withVideo = false)
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
@@ -30,10 +57,11 @@ class Jingle
         $description->setAttribute('media', 'audio');
         $propose->appendChild($description);
 
+        self::appendStoreHint($dom, $message);
         return $dom;
     }
 
-    // Deprecated
+    // Deprecated by the current XEP-0353 flow, retained for interoperability.
     public static function messageAccept(string $id)
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
@@ -45,6 +73,7 @@ class Jingle
         $accept->setAttribute('id', $id);
         $message->appendChild($accept);
 
+        self::appendStoreHint($dom, $message);
         return $dom;
     }
 
@@ -60,6 +89,7 @@ class Jingle
         $ringing->setAttribute('id', $id);
         $message->appendChild($ringing);
 
+        self::appendStoreHint($dom, $message);
         return $dom;
     }
 
@@ -75,11 +105,17 @@ class Jingle
         $proceed->setAttribute('id', $id);
         $message->appendChild($proceed);
 
+        self::appendStoreHint($dom, $message);
         return $dom;
     }
 
-    public static function messageRetract(string $to, string $id)
-    {
+    public static function messageRetract(
+        string $to,
+        string $id,
+        string $reason = 'cancel',
+        ?string $text = 'Retracted',
+        bool $tieBreak = false
+    ) {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         $message = $dom->createElementNS('jabber:client', 'message');
         $message->setAttribute('type', 'chat');
@@ -90,11 +126,9 @@ class Jingle
         $retract->setAttribute('id', $id);
         $message->appendChild($retract);
 
-        $reason = $dom->createElementNS('urn:xmpp:jingle:1', 'reason');
-        $retract->appendChild($reason);
-
-        $reason->appendChild($dom->createElement('cancel'));
-        $reason->appendChild($dom->createElement('text', 'Retracted'));
+        self::appendReason($dom, $retract, $reason, $text);
+        self::appendTieBreak($dom, $retract, $tieBreak);
+        self::appendStoreHint($dom, $message);
 
         return $dom;
     }
@@ -111,17 +145,19 @@ class Jingle
         $finish->setAttribute('id', $id);
         $message->appendChild($finish);
 
-        $jingleReason = $dom->createElementNS('urn:xmpp:jingle:1', 'reason');
-        $finish->appendChild($jingleReason);
-
-        $jingleReason->appendChild($dom->createElement($reason));
-        $jingleReason->appendChild($dom->createElement('text', 'Success'));
+        self::appendReason($dom, $finish, $reason, ucfirst(str_replace('-', ' ', $reason)));
+        self::appendStoreHint($dom, $message);
 
         return $dom;
     }
 
-    public static function messageReject($id, $to = false)
-    {
+    public static function messageReject(
+        string $id,
+        string|false $to = false,
+        string $reason = 'busy',
+        ?string $text = 'Busy',
+        bool $tieBreak = false
+    ) {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         $message = $dom->createElementNS('jabber:client', 'message');
         $message->setAttribute('type', 'chat');
@@ -130,9 +166,13 @@ class Jingle
         }
         $dom->appendChild($message);
 
-        $proceed = $dom->createElementNS('urn:xmpp:jingle-message:0', 'reject');
-        $proceed->setAttribute('id', $id);
-        $message->appendChild($proceed);
+        $reject = $dom->createElementNS('urn:xmpp:jingle-message:0', 'reject');
+        $reject->setAttribute('id', $id);
+        $message->appendChild($reject);
+
+        self::appendReason($dom, $reject, $reason, $text);
+        self::appendTieBreak($dom, $reject, $tieBreak);
+        self::appendStoreHint($dom, $message);
 
         return $dom;
     }
