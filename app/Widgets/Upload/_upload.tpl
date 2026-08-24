@@ -69,6 +69,9 @@
             </span>
             <div>
                 <p class="line"></p>
+                <div class="bar">
+                    <span></span>
+                </div>
             </div>
         </li>
     </ul>

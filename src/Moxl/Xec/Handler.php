@@ -27,18 +27,15 @@ class Handler
 
             $error = false;
 
-            // Handle specific query error
             if ($child->query->error) {
                 $error = $child->query->error;
             } elseif ($child->error) {
                 $error = $child->error;
             }
 
-            // XMPP returned an error
             if ($error) {
                 $errors = $error->children();
                 $errorid = $this->formatError($errors->getName());
-
                 $message = null;
 
                 if ($error->text) {
@@ -46,23 +43,19 @@ class Handler
                 }
 
                 logInfo('Handler: ' . get_class($action) . ' ' . $id . ' - ' . $errorid);
-
                 $propagate = true;
 
-                // If the action has defined a special handler for this error
                 if (method_exists($action, $errorid)) {
                     $action->method($errorid);
                     $propagate = $action->$errorid($errorid, $message);
                 }
 
-                // We also call a global error handler
                 if (method_exists($action, 'error') && $propagate == true) {
                     logInfo('Handler: Global error - ' . $id . ' - ' . $errorid);
                     $action->method('error');
                     $action->error($errorid, $message);
                 }
             } elseif (method_exists($action, 'handle')) {
-                // We launch the object handle
                 $action->method('handle');
                 $action->attachUser($this->user);
                 $action->attachSession($this->sessionId);
@@ -72,7 +65,6 @@ class Handler
             logInfo("Handler: No memory instance found for {$id}");
 
             $handledFirst = $handledSecond = $handledThird = false;
-
             $handledFirst = $this->handleNode($child);
 
             foreach ($child->children() as $s1) {
@@ -174,12 +166,13 @@ class Handler
             '0923dd6b12f46f658b4273104a129ec9' => 'JinglePropose',
             '829715591c7554bad3630dfd3353b4e7' => 'JingleAccept',
             '0c0238797befe918ac81efaa0200771b' => 'JingleProceed',
+            '5da51ee2123986c3200173210eb50da5' => 'JingleRinging',
             '46ee3ca42af934e8a3b4d42062817aa8' => 'JingleRetract',
             '44d0c16e222fcdee6961c8939b647e15' => 'JingleReject',
             '1622ee132ba08e9ccf42bfa3956931f9' => 'JingleFinish',
             'd84d4b89d43e88a244197ccf499de8d8' => 'Jingle',
 
-            '09ef1b34cf40fdd954f10d6e5075ee5c' => 'Carbons', // sent
+            '09ef1b34cf40fdd954f10d6e5075ee5' => 'Carbons', // sent
             '201fa54dd93e3403611830213f5f9fbc' => 'Carbons', // received
 
             'da6b60476aeab672ac0afe3ff27dc6a4' => 'OMEMODevices',
@@ -220,10 +213,6 @@ class Handler
         return false;
     }
 
-    /**
-     * A simple function to format a error-string-text to a
-     * camelTypeText
-     */
     private function formatError(string $string): string
     {
         $words = explode('-', $string);
